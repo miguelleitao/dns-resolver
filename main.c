@@ -57,20 +57,8 @@ void get_dns_servers(char *str[]);
 void change_to_dns_format(char *src, unsigned char *dest);
 void change_to_dot_format(unsigned char *str);
 
-int main(int argc, char *argv[]) {
 
-	/* Prints message and exits if user enters less than or more than one
-	argument */
-	if(argc == 1) {
-		printf("Usage: resolver <hostname(s) to check>\n");
-		return 1;
-	}
-
-	if(argc > 2) {
-		printf("Multiple queries are not supported.\n");
-		return 1;
-	}
-
+int resolver(char *server_addr, char *hostname) {
 	HEADER *header = NULL;
 	unsigned char *qname;
 	Q_FLAGS *qflags = NULL;
@@ -81,15 +69,6 @@ int main(int argc, char *argv[]) {
 	unsigned char packet[65536];
 	unsigned char *temp;	
 	int i, j, steps = 0;
-
-	/* Obtaining the DNS servers from the resolv.conf file */
-	char **dns_addr = malloc(10 * sizeof(char *));
-	for(i = 0; i < 10; ++i)
-		dns_addr[i] = malloc(INET_ADDRSTRLEN);
-	get_dns_servers(dns_addr);
-	
-	for(i = 0; i < 10; ++i)
-		if ( dns_addr[i] ) printf("server %d: %s\n", i, dns_addr[i]);
 
 	/* Building the Header portion of the query packet */
 	header = (HEADER *)&packet;
@@ -102,7 +81,7 @@ int main(int argc, char *argv[]) {
 	header->ra = 0;
 	header->z = 0;
 	header->rcode = 0;
-	header->qdcount = htons((unsigned short)(argc - 1));
+	header->qdcount = htons((unsigned short)(1));
 	header->ancount = 0x0000;
 	header->nscount = 0x0000;
 	header->arcount = 0x0000;
@@ -112,7 +91,7 @@ int main(int argc, char *argv[]) {
 	/* Adding user-entered hostname into query packet and converting into DNS
 	format */
 	qname = (unsigned char *)&packet[steps];
-	change_to_dns_format(argv[1], qname);
+	change_to_dns_format(hostname, qname);
 
 	steps = steps + (strlen((const char *)qname) + 1);
 
@@ -130,7 +109,7 @@ int main(int argc, char *argv[]) {
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(53);
-	inet_pton(AF_INET, dns_addr[0], &(servaddr.sin_addr));
+	inet_pton(AF_INET, server_addr, &(servaddr.sin_addr));
 
 	/* Connecting to the DNS server */
 	connect(sock_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
@@ -141,9 +120,6 @@ int main(int argc, char *argv[]) {
 	/* Receiving the response packet from the DNS server */
 	if(read(sock_fd, (unsigned char *)packet, 65536) <= 0)
 	close(sock_fd);
-	for(i = 0; i < 10; ++i)
-		free(dns_addr[i]);
-	free(dns_addr);	
 
 	/* Parsing the Header portion of the reply packet */
 	header = (HEADER *)&packet;
@@ -230,6 +206,39 @@ int main(int argc, char *argv[]) {
 	putchar('\n');
 
 	return 0;
+}
+
+int main(int argc, char *argv[]) {
+
+	/* Prints message and exits if user enters less than or more than one
+	argument */
+	if(argc == 1) {
+		printf("Usage: resolver <hostname(s) to check>\n");
+		return 1;
+	}
+
+	if(argc > 2) {
+		printf("Multiple queries are not supported.\n");
+		return 1;
+	}
+	
+	/* Obtaining the DNS servers from the resolv.conf file */
+	char **dns_addr = malloc(10 * sizeof(char *));
+	int i;
+	for(i = 0; i < 10; ++i)
+		dns_addr[i] = malloc(INET_ADDRSTRLEN);
+	get_dns_servers(dns_addr);
+	
+	for(i = 0; i < 10; ++i)
+		if ( dns_addr[i] ) printf("server %d: %s\n", i, dns_addr[i]);
+		
+	resolver(dns_addr[0], argv[1]);
+	
+	
+	for(i = 0; i < 10; ++i)
+		free(dns_addr[i]);
+	free(dns_addr);	
+	
 }
 
 /* The function obtains the DNS servers stored in /etc/resolv.conf */
