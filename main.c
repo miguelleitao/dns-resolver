@@ -87,6 +87,9 @@ int main(int argc, char *argv[]) {
 	for(i = 0; i < 10; ++i)
 		dns_addr[i] = malloc(INET_ADDRSTRLEN);
 	get_dns_servers(dns_addr);
+	
+	for(i = 0; i < 10; ++i)
+		if ( dns_addr[i] ) printf("server %d: %s\n", i, dns_addr[i]);
 
 	/* Building the Header portion of the query packet */
 	header = (HEADER *)&packet;
@@ -127,7 +130,7 @@ int main(int argc, char *argv[]) {
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(53);
-	inet_pton(AF_INET, dns_addr[1], &(servaddr.sin_addr));
+	inet_pton(AF_INET, dns_addr[0], &(servaddr.sin_addr));
 
 	/* Connecting to the DNS server */
 	connect(sock_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
