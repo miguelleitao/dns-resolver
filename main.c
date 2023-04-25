@@ -241,7 +241,6 @@ int main(int argc, char *argv[]) {
 		
 	resolver(dns_addr[0], argv[1]);
 	
-	printf("Dealloc...\n");
 	for(int i = 0; i < n_dns_addr; ++i)
 		if ( dns_addr[i] ) free(dns_addr[i]);
 	free(dns_addr);	
