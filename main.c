@@ -118,8 +118,8 @@ int resolver(char *server_addr, char *hostname) {
 	write(sock_fd, (unsigned char *)packet, steps);
 
 	/* Receiving the response packet from the DNS server */
-	if(read(sock_fd, (unsigned char *)packet, 65536) <= 0)
-	close(sock_fd);
+	if ( read(sock_fd, (unsigned char *)packet, 65536) <= 0 )
+	    close(sock_fd);
 
 	/* Parsing the Header portion of the reply packet */
 	header = (HEADER *)&packet;
@@ -135,13 +135,12 @@ int resolver(char *server_addr, char *hostname) {
 	steps = steps + sizeof(Q_FLAGS);
 
 	/* Parsing the RRs from the reply packet */
-	for(i = 0; i < ntohs(header->ancount); ++i) {
-
+	for( i=0 ; i<ntohs(header->ancount) ; ++i ) {
 		/* Parsing the NAME portion of the RR */		
 		temp = (unsigned char *)&packet[steps];
 		j = 0;
-		while(*temp != 0) {
-			if(*temp == 0xc0) {
+		while( *temp!=0) {
+			if( *temp==0xc0) {
 				++temp;
 				temp = (unsigned char*)&packet[*temp];
 			}
@@ -152,7 +151,7 @@ int resolver(char *server_addr, char *hostname) {
 			}
 		}
 		name[i][j] = '\0';
-		change_to_dot_format(name[i]);
+		//change_to_dot_format(name[i]);
 		steps = steps + 2;
 
 		/* Parsing the RR flags of the RR */
@@ -160,7 +159,7 @@ int resolver(char *server_addr, char *hostname) {
 		steps = steps + sizeof(RR_FLAGS) - 2;
 
 		/* Parsing the IPv4 address in the RR */
-		if(ntohs(rrflags->type) == 1) {
+		if ( ntohs(rrflags->type)==1 ) {
 			for(j = 0; j < ntohs(rrflags->rdlength); ++j)
 				rdata[i][j] = (unsigned char)packet[steps + j];
 			type[i] = ntohs(rrflags->type);
@@ -210,33 +209,41 @@ int resolver(char *server_addr, char *hostname) {
 
 int main(int argc, char *argv[]) {
 
-	/* Prints message and exits if user enters less than or more than one
-	argument */
-	if(argc == 1) {
-		printf("Usage: resolver <hostname(s) to check>\n");
-		return 1;
+	char **dns_addr = malloc(10 * sizeof(char *));
+	int  n_dns_addr = 0;
+	
+	if ( argc>1 && argv[1][0]=='@' ) {
+		dns_addr[0] = strdup(argv[1]+1);
+		n_dns_addr = 1;
+		argc--;
+		argv++;
 	}
 
+	if ( argc<=1 ) {
+		printf("Usage: resolver [@dnsserver] <hostname(s) to check>\n");
+		return 1;
+	}
+	
 	if(argc > 2) {
 		printf("Multiple queries are not supported.\n");
 		return 1;
 	}
 	
-	/* Obtaining the DNS servers from the resolv.conf file */
-	char **dns_addr = malloc(10 * sizeof(char *));
-	int i;
-	for(i = 0; i < 10; ++i)
-		dns_addr[i] = malloc(INET_ADDRSTRLEN);
-	get_dns_servers(dns_addr);
-	
-	for(i = 0; i < 10; ++i)
+	if ( n_dns_addr==0 ) {
+		/* Obtaining the DNS servers from the resolv.conf file */
+		int i;
+		for(i = 0; i < 10; ++i)
+		    dns_addr[i] = malloc(INET_ADDRSTRLEN);
+		get_dns_servers(dns_addr);
+	}
+	for(int i = 0; i < n_dns_addr; ++i)
 		if ( dns_addr[i] ) printf("server %d: %s\n", i, dns_addr[i]);
 		
 	resolver(dns_addr[0], argv[1]);
 	
-	
-	for(i = 0; i < 10; ++i)
-		free(dns_addr[i]);
+	printf("Dealloc...\n");
+	for(int i = 0; i < n_dns_addr; ++i)
+		if ( dns_addr[i] ) free(dns_addr[i]);
 	free(dns_addr);	
 	
 }
@@ -287,13 +294,13 @@ void change_to_dns_format(char *src, unsigned char *dest) {
 3www5apple3com0 into www.apple.com) */
 void change_to_dot_format(unsigned char *str) {
 	int i, j;
-	for(i = 0; i < strlen((const char*)str); ++i) {
+	for( i=0 ; i<strlen((const char*)str) ; ++i ) {
 		unsigned int len = str[i];
-		for(j = 0; j < len; ++j) {
+		for( j=0; j<len ; ++j ) {
 			str[i] = str[i + 1];
 			++i;
 		}
 		str[i] = '.';
 	}
-	str[i - 1] = '\0';
+	str[i-1] = '\0';
 }
