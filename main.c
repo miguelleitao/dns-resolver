@@ -53,7 +53,7 @@ typedef struct rr_flags {
 	unsigned short rdlength;
 } RR_FLAGS;
 
-void get_dns_servers(char *str[]);
+int get_dns_servers(char *str[]);
 void change_to_dns_format(char *src, unsigned char *dest);
 void change_to_dot_format(unsigned char *str);
 
@@ -139,7 +139,9 @@ int resolver(char *server_addr, char *hostname) {
 		/* Parsing the NAME portion of the RR */		
 		temp = (unsigned char *)&packet[steps];
 		j = 0;
+		//printf("temp(%d):\n", i);
 		while( *temp!=0) {
+		        //printf("    %x %d %c\n", *temp, *temp, *temp);
 			if( *temp==0xc0) {
 				++temp;
 				temp = (unsigned char*)&packet[*temp];
@@ -151,7 +153,7 @@ int resolver(char *server_addr, char *hostname) {
 			}
 		}
 		name[i][j] = '\0';
-		//change_to_dot_format(name[i]);
+		if ( i>0 ) change_to_dot_format(name[i]);
 		steps = steps + 2;
 
 		/* Parsing the RR flags of the RR */
@@ -188,10 +190,12 @@ int resolver(char *server_addr, char *hostname) {
 	}
 	
 	/* Printing the output */
+	
+	int anc = ntohs(header->ancount);
 	printf("QNAME: %s\n", qname);
-	printf("ANCOUNT: %d\n", ntohs(header->ancount));	
-	printf("\nRDATA:");
-	for(i = 0; i < ntohs(header->ancount); ++i) {
+	printf("ANCOUNT: %d\n", anc);	
+	printf("RDATA:");
+	for( i=0 ; i<anc ; ++i ) {
 		printf("\nNAME: %s\n\t", name[i]);		
 		if(type[i] == 5)
 			printf("CNAME: %s", rdata[i]);
@@ -204,7 +208,7 @@ int resolver(char *server_addr, char *hostname) {
 	}
 	putchar('\n');
 
-	return 0;
+	return anc;
 }
 
 int main(int argc, char *argv[]) {
@@ -234,12 +238,12 @@ int main(int argc, char *argv[]) {
 		int i;
 		for(i = 0; i < 10; ++i)
 		    dns_addr[i] = malloc(INET_ADDRSTRLEN);
-		get_dns_servers(dns_addr);
+		n_dns_addr = get_dns_servers(dns_addr);
 	}
-	for(int i = 0; i < n_dns_addr; ++i)
-		if ( dns_addr[i] ) printf("server %d: %s\n", i, dns_addr[i]);
-		
-	resolver(dns_addr[0], argv[1]);
+	for(int i = 0; i < n_dns_addr; ++i) {
+		if ( dns_addr[i] ) printf("\nSERVER %d: %s\n", i, dns_addr[i]);
+	        resolver(dns_addr[0], argv[1]);
+	}
 	
 	for(int i = 0; i < n_dns_addr; ++i)
 		if ( dns_addr[i] ) free(dns_addr[i]);
@@ -248,11 +252,10 @@ int main(int argc, char *argv[]) {
 }
 
 /* The function obtains the DNS servers stored in /etc/resolv.conf */
-void get_dns_servers(char *str[]) {
-
+int get_dns_servers(char *str[]) {
 	FILE *resolv_file;
 	char line[100];
-	int i = 0;
+	int i=0;
 
 	resolv_file = fopen("/etc/resolv.conf", "rt");
 	
@@ -264,8 +267,8 @@ void get_dns_servers(char *str[]) {
 			++i;
 		}
 	}
-
 	fclose(resolv_file);
+	return i;
 }
 
 /* The function converts the dot-based hostname into the DNS format (i.e.
